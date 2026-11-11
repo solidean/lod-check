@@ -1,0 +1,4 @@
+build/
+build-*/
+lod-check-results.md
+*.csv

@@ -1,0 +1,81 @@
+name: build
+
+# Every push builds all three; a v* tag also publishes them as a release, so every download traces back to its source.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-2022
+            binary: build/Release/lod-check.exe
+          # 22.04's glibc keeps the binary running on older distributions; gcc 13 brings std::format.
+          - name: linux-x64
+            os: ubuntu-22.04
+            binary: build/lod-check
+          # Universal, so Intel Macs with AMD GPUs report too.
+          - name: macos-universal
+            os: macos-14
+            binary: build/lod-check
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install gcc 13
+        if: runner.os == 'Linux'
+        run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y g++-13
+          echo "CXX=g++-13" >> "$GITHUB_ENV"
+
+      - name: Configure
+        shell: bash
+        run: |
+          extra=()
+          if [ "$RUNNER_OS" = "macOS" ]; then extra+=("-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"); fi
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release "${extra[@]}"
+
+      - name: Build
+        run: cmake --build build --config Release
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist/lod-check
+          cp "${{ matrix.binary }}" README.md LICENSE dist/lod-check/
+          cd dist
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a "lod-check-${{ matrix.name }}.zip" lod-check
+          else
+            zip -r "lod-check-${{ matrix.name }}.zip" lod-check
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lod-check-${{ matrix.name }}
+          path: dist/lod-check-${{ matrix.name }}.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" dist/*.zip --repo "${{ github.repository }}" --title "lod-check ${{ github.ref_name }}" --generate-notes

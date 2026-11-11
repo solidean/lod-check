@@ -1,0 +1,76 @@
+// lod-check's probe for Vulkan, the same shader as probe.hlsl.
+//
+// Compiled to SPIR-V ahead of time by tools/compile-spirv.py, which writes probe.comp.spv.inc; commit both together.
+// The pyramid's mip m holds m, so a sample reads m plus the weight the filter gave mip m + 1.
+// Thread x is a step of the level sweep, group y the sampling path, group z the sampler.
+
+#version 450
+
+layout(local_size_x = 64) in;
+
+layout(set = 0, binding = 0) uniform texture2D pyramid;
+// Trilinear, repeating, no bias; anisotropy 1, 2, 3, 4, 6, 8, 12, 16.
+layout(set = 0, binding = 1) uniform sampler samplers[8];
+layout(set = 0, binding = 2, std430) writeonly buffer Samples
+{
+    float samples[];
+};
+
+const float anisotropies[8] = float[8](1, 2, 3, 4, 6, 8, 12, 16);
+
+// Constant indices only, so no device needs dynamic sampler indexing.
+float sample_level(uint s, vec2 uv, float level)
+{
+    switch (s)
+    {
+    case 0: return textureLod(sampler2D(pyramid, samplers[0]), uv, level).x;
+    case 1: return textureLod(sampler2D(pyramid, samplers[1]), uv, level).x;
+    case 2: return textureLod(sampler2D(pyramid, samplers[2]), uv, level).x;
+    case 3: return textureLod(sampler2D(pyramid, samplers[3]), uv, level).x;
+    case 4: return textureLod(sampler2D(pyramid, samplers[4]), uv, level).x;
+    case 5: return textureLod(sampler2D(pyramid, samplers[5]), uv, level).x;
+    case 6: return textureLod(sampler2D(pyramid, samplers[6]), uv, level).x;
+    default: return textureLod(sampler2D(pyramid, samplers[7]), uv, level).x;
+    }
+}
+
+float sample_grad(uint s, vec2 uv, vec2 dx, vec2 dy)
+{
+    switch (s)
+    {
+    case 0: return textureGrad(sampler2D(pyramid, samplers[0]), uv, dx, dy).x;
+    case 1: return textureGrad(sampler2D(pyramid, samplers[1]), uv, dx, dy).x;
+    case 2: return textureGrad(sampler2D(pyramid, samplers[2]), uv, dx, dy).x;
+    case 3: return textureGrad(sampler2D(pyramid, samplers[3]), uv, dx, dy).x;
+    case 4: return textureGrad(sampler2D(pyramid, samplers[4]), uv, dx, dy).x;
+    case 5: return textureGrad(sampler2D(pyramid, samplers[5]), uv, dx, dy).x;
+    case 6: return textureGrad(sampler2D(pyramid, samplers[6]), uv, dx, dy).x;
+    default: return textureGrad(sampler2D(pyramid, samplers[7]), uv, dx, dy).x;
+    }
+}
+
+void main()
+{
+    const uint steps = 7 * 64 + 1;
+    const uvec3 id = gl_GlobalInvocationID;
+    if (id.x >= steps)
+        return;
+
+    const float level = float(id.x) / 64.0;
+    const vec2 uv = vec2(0.375, 0.625);
+    // One texel of the requested level, in uv: the footprint every path asks for.
+    const float extent = exp2(level) / 256.0;
+
+    float result;
+    if (id.y == 0)
+        result = sample_level(id.z, uv, level);
+    else if (id.y == 1)
+        result = sample_grad(id.z, uv, vec2(extent, 0), vec2(0, extent));
+    else
+    {
+        // A 4:1 footprint whose level is still `level`: the specification divides the major axis by min(4, anisotropy).
+        const float major = extent * min(4.0, anisotropies[id.z]);
+        result = sample_grad(id.z, uv, vec2(major, 0), vec2(0, major / 4.0));
+    }
+    samples[(id.z * 3 + id.y) * steps + id.x] = result;
+}
