@@ -29,8 +29,9 @@ Options: `--out <file>`, `--no-file`, `--curves <file>` (every curve as CSV), `-
 ## How it works
 
 Mip *m* of a 256 × 256 texture holds the value *m*, so a trilinear sample returns *m* plus the weight of mip *m* + 1.
-One compute dispatch sweeps the requested level in 1/64 steps for anisotropy 1 to 16, using an explicit level and explicit gradients for a square and a 4:1 footprint.
+One compute dispatch sweeps the requested level in 1/64 steps for anisotropy 1 to 16, using an explicit level and explicit gradients for a square, a 4:1 and a 16:1 footprint.
 The shift is read where the sample crosses *m* + 0.5.
+The 16:1 footprint exceeds every max anisotropy, so its shift against the square one shows the anisotropy the GPU actually applies.
 See [shaders/](shaders/) and [src/analysis.cc](src/analysis.cc).
 
 ## Build

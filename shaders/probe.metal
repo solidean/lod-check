@@ -31,9 +31,11 @@ kernel void probe(texture2d<float> pyramid [[texture(0)]],
         result = pyramid.sample(s, uv, gradient2d(float2(extent, 0), float2(0, extent))).x;
     else
     {
-        // A 4:1 footprint whose level is still `lod`: the specification divides the major axis by min(4, anisotropy).
-        const float major = extent * min(4.0, anisotropies[id.z]);
-        result = pyramid.sample(s, uv, gradient2d(float2(major, 0), float2(0, major / 4.0))).x;
+        // A 4:1 or 16:1 footprint whose level is still `lod`: the specification divides the major axis by
+        // min(ratio, anisotropy).
+        const float ratio = id.y == 2 ? 4.0 : 16.0;
+        const float major = extent * min(ratio, anisotropies[id.z]);
+        result = pyramid.sample(s, uv, gradient2d(float2(major, 0), float2(0, major / ratio))).x;
     }
-    samples[(id.z * 3 + id.y) * steps + id.x] = result;
+    samples[(id.z * 4 + id.y) * steps + id.x] = result;
 }

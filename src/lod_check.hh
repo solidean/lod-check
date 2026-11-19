@@ -29,14 +29,18 @@ inline constexpr int anisotropies[] = {1, 2, 3, 4, 6, 8, 12, 16};
 inline constexpr int anisotropy_count = int(sizeof(anisotropies) / sizeof(anisotropies[0]));
 
 /// Where a sample's level comes from.
-/// Every path asks for the same level, so a driver that treats them alike draws three identical curves.
+/// Every path asks for the same level, so a driver that treats them alike draws identical curves.
 enum path : int
 {
     path_level = 0,  ///< an explicit level: SampleLevel, textureLod, level()
     path_square = 1, ///< explicit gradients of a square footprint: SampleGrad, textureGrad, gradient2d()
     path_wide = 2,   ///< explicit gradients of a 4:1 footprint, the anisotropic case proper
+    path_steep = 3,  ///< explicit gradients of a 16:1 footprint, beyond every sampler's limit
 };
-inline constexpr int path_count = 3;
+inline constexpr int path_count = 4;
+
+/// The major-to-minor ratio of each path's footprint.
+inline constexpr float footprint_ratios[path_count] = {1, 1, 4, 16};
 
 /// The level step `i` asks for.
 inline float sweep_level(int i)

@@ -213,6 +213,46 @@ void format_verdicts(std::string& out, std::vector<gpu_run const*> const& runs)
                                std::abs(worst), worst > 0 ? "coarser" : "finer", runs[0]->api);
     }
 }
+
+/// The max anisotropy the run behaved as if it applied on footprint path `p`, read from its shift against the square
+/// footprint: the specification divides the major axis by min(ratio, anisotropy), so each level of extra shift halves
+/// the anisotropy actually used.
+std::optional<float> applied_anisotropy(gpu_run const& run, int anisotropy_index, path p)
+{
+    auto const s = summarize(&run.samples[sample_index(anisotropy_index, p, 0)]);
+    auto const ref = summarize(&run.samples[sample_index(anisotropy_index, path_square, 0)]);
+    if (!s.valid || !ref.valid)
+        return std::nullopt;
+    auto const specified = std::min(footprint_ratios[p], float(anisotropies[anisotropy_index]));
+    return specified * std::exp2(-(s.shift - ref.shift));
+}
+
+/// "2x" for an anisotropy within 0.05 of a whole number, "2.6x" otherwise.
+std::string format_anisotropy(float e)
+{
+    auto const whole = std::round(e);
+    return std::abs(e - whole) < 0.05f ? std::format("{}x", int(whole)) : std::format("{:.1f}x", e);
+}
+
+/// Per run, the max anisotropy settings it applies as another value, read from the 16:1 footprint,
+/// which every setting up to 16x limits.
+void format_applied(std::string& out, std::vector<gpu_run const*> const& runs)
+{
+    for (auto const* run : runs)
+    {
+        auto changed = std::string();
+        for (auto a = 0; a < anisotropy_count; ++a)
+        {
+            auto const e = applied_anisotropy(*run, a, path_steep);
+            if (e && std::abs(*e - float(anisotropies[a])) / float(anisotropies[a]) > 0.02f)
+                changed += std::format("{}{}x as {}", changed.empty() ? "" : ", ", anisotropies[a], format_anisotropy(*e));
+        }
+        if (changed.empty())
+            out += std::format("  {} applies every max anisotropy as set.\n", run->api);
+        else
+            out += std::format("  {} applies a max anisotropy of {}.\n", run->api, changed);
+    }
+}
 } // namespace
 
 std::vector<std::uint16_t> pyramid_mip(int mip)
@@ -252,9 +292,11 @@ std::string format_report(std::vector<gpu_run> const& runs)
                "footprint.\n\n";
         format_table(out, measured, path_square);
 
-        for (auto const p : {path_level, path_wide})
+        for (auto const p : {path_level, path_wide, path_steep})
         {
-            auto const name = p == path_level ? "An explicit level" : "A 4:1 footprint";
+            auto const name = p == path_level  ? "An explicit level"
+                            : p == path_wide   ? "A 4:1 footprint"
+                                               : "A 16:1 footprint";
             auto const rows = differing_rows(measured, p);
             if (rows.empty())
             {
@@ -270,12 +312,16 @@ std::string format_report(std::vector<gpu_run> const& runs)
                     auto const s = summarize(&measured[r]->samples[sample_index(rows[i], p, 0)]);
                     out += std::format("{} {} {}", r == 0 ? "" : ",", measured[r]->api,
                                        s.valid ? std::format("{:+.3f}", s.shift) : std::string("n/a"));
+                    if (p != path_level)
+                        if (auto const e = applied_anisotropy(*measured[r], rows[i], p))
+                            out += std::format(" (as if {})", format_anisotropy(*e));
                 }
             }
             out += '.';
         }
         out += "\n\n";
         format_verdicts(out, measured);
+        format_applied(out, measured);
     }
     return out;
 }
@@ -283,7 +329,7 @@ std::string format_report(std::vector<gpu_run> const& runs)
 std::string format_curves(std::vector<gpu_run> const& runs)
 {
     auto out = std::string("api,gpu,anisotropy,path,level,sample\n");
-    constexpr char const* path_names[] = {"level", "square", "wide"};
+    constexpr char const* path_names[] = {"level", "square", "wide", "steep"};
     for (auto const& run : runs)
     {
         if (!run.error.empty() || run.adapter.empty())
