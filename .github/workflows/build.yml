@@ -24,9 +24,9 @@ jobs:
           - name: linux-x64
             os: ubuntu-22.04
             binary: build/lod-check
-          # Universal, so Intel Macs with AMD GPUs report too.
+          # Universal, so Intel Macs with AMD GPUs report too; CMakeLists.txt's deployment target keeps it running on macOS 14.
           - name: macos-universal
-            os: macos-14
+            os: macos-15
             binary: build/lod-check
     runs-on: ${{ matrix.os }}
     steps:
