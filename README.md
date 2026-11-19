@@ -16,6 +16,13 @@ The builds are not code-signed yet:
 - **Windows** SmartScreen may warn about an unknown publisher; *More info* → *Run anyway*.
 - **macOS** Gatekeeper refuses unsigned downloads; right-click → *Open*, or `xattr -d com.apple.quarantine lod-check`.
 
+Every release is built by this repository's [GitHub Actions workflow](.github/workflows/build.yml) from the tagged commit.
+To check a download, compare it against the release's `SHA256SUMS`, or verify where it was built with the [GitHub CLI](https://cli.github.com/):
+
+```
+gh attestation verify lod-check-windows-x64.zip --repo solidean/lod-check
+```
+
 Or build it yourself, below; it is a few hundred lines per API.
 
 ## What it prints
