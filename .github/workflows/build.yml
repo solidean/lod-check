@@ -62,7 +62,7 @@ jobs:
             zip -r "lod-check-${{ matrix.name }}.zip" lod-check
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: lod-check-${{ matrix.name }}
           path: dist/lod-check-${{ matrix.name }}.zip
@@ -87,7 +87,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/download-artifact@v5
+      - uses: actions/download-artifact@v7
         with:
           path: dist
           merge-multiple: true
