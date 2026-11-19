@@ -98,7 +98,9 @@ jobs:
 
       # Lets anyone check a download came from this repository's workflow:
       # gh attestation verify lod-check-<platform>.zip --repo <owner>/lod-check
+      # Private repositories get attestations only on GitHub Enterprise Cloud.
       - uses: actions/attest-build-provenance@v3
+        if: github.event.repository.visibility == 'public'
         with:
           subject-path: dist/*.zip
 
