@@ -25,10 +25,10 @@ std::uint16_t half_of(int value)
 ///
 /// A sample reads m plus the weight of mip m + 1.
 /// That weight equals the level's fraction only for a linear blend, and drivers sharpen it once anisotropy is on.
-/// Where the curve crosses m + 0.5 is the blend's centre under any symmetric blend, so the shift is read there.
+/// Where the curve crosses m + 0.5 is the blend's center under any symmetric blend, so the shift is read there.
 struct summary
 {
-    float shift = 0; ///< m + 0.5 minus the level at the centre: positive reaches the coarser mip early, so blurrier
+    float shift = 0; ///< m + 0.5 minus the level at the center: positive reaches the coarser mip early, so blurrier
     float width = 0; ///< the level range from 10% to 90% of the blend: 0.8 for a linear one
     bool valid = false;
 };
@@ -188,7 +188,7 @@ void format_verdicts(std::string& out, std::vector<gpu_run const*> const& runs)
     {
         auto const [largest, narrowest] = extremes(*run);
         auto const where = std::abs(largest.shift) < tolerance
-                             ? std::string("centres each blend where the specification does")
+                             ? std::string("centers each blend where the specification does")
                              : std::format("reads up to {:.3f} levels {} than the specification", std::abs(largest.shift),
                                            largest.shift > 0 ? "coarser (blurrier)" : "finer (sharper)");
         auto const shape = narrowest > 0.75f
@@ -287,7 +287,7 @@ std::string format_report(std::vector<gpu_run> const& runs)
         if (measured.empty())
             continue;
 
-        out += "\n  Shift of each mip blend from where the specification centres it, in levels (+ is blurrier),\n";
+        out += "\n  Shift of each mip blend from where the specification centers it, in levels (+ is blurrier),\n";
         out += "  and the blend's width from 10% to 90% (a linear blend is 0.80). Explicit gradients, square "
                "footprint.\n\n";
         format_table(out, measured, path_square);
